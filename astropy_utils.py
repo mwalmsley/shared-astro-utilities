@@ -2,7 +2,7 @@
 
 from astropy.table import Table
 
-from time_utils import current_time
+from .time_utils import current_time  # use a relative import, this could be a package
 
 
 def cache_table(table_loc, cache_loc, useful_cols, loading_func=Table.read, kwargs=None):

@@ -3,11 +3,12 @@ import pytest
 from astropy import units as u
 from astropy.table import Table
 
-import matching_utils
+from . import matching_utils  # will fail, but work when imported
 
 
 @pytest.fixture()
 def galaxies():
+    print(__name__)
     return Table([
         {
             'name': 'a',

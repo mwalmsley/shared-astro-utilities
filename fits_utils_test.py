@@ -1,8 +1,12 @@
 import pytest
 
-import fits_utils
+import os
 
-TEST_EXAMPLES_DIR = 'test_examples'
+from shared_astro_utilities import fits_utils
+
+# path relative to this file, regardless of working directory
+CURRENT_DIR = os.path.dirname(__file__)
+TEST_EXAMPLES_DIR = os.path.join(CURRENT_DIR, 'test_examples')
 
 
 def test_fits_are_identical():

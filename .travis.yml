@@ -13,5 +13,7 @@ before_script:
   - ./cc-test-reporter before-build
 script:
   - pytest --cov=./
+after_success:
+  - coveralls
 after_script:
-- ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
+  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT

@@ -1,6 +1,6 @@
 import pytest
 
-from astropy import units as u
+from astropy import units as units
 from astropy.table import Table
 
 from shared_astro_utils import matching_utils
@@ -60,9 +60,20 @@ def test_match_galaxies_to_catalog_table(galaxies, catalog):
     assert set(unmatched.colnames) == {'dec', 'name', 'ra', 'z', 'best_match', 'sky_separation', 'galaxy_data'}
 
 
+def test_match_galaxies_to_catalog_table_right_join(galaxies, catalog):
+
+    matched, unmatched = matching_utils.match_galaxies_to_catalog_table(galaxies, catalog, join_type='right')
+
+    assert set(matched['name']) == {'a', 'c'}  # should include both (right) catalog galaxies, but not the unmatched (left) galaxy
+    assert unmatched['name'] == ['b']
+
+    assert set(matched.colnames) == {'dec_subject',  'galaxy_data', 'name_subject', 'ra_subject', 'z_subject', 'best_match', 'sky_separation', 'dec', 'name', 'ra', 'table_data', 'z'}
+    assert set(unmatched.colnames) == {'dec', 'name', 'ra', 'z', 'best_match', 'sky_separation', 'galaxy_data'}
+
+
 def test_match_galaxies_to_catalog_table_awkward_units(galaxies, catalog):
-    galaxies['ra'] = galaxies['ra'] * u.deg
-    catalog['dec'] = catalog['dec'] * u.deg
+    galaxies['ra'] = galaxies['ra'] * units.deg
+    catalog['dec'] = catalog['dec'] * units.deg
 
     matched, unmatched = matching_utils.match_galaxies_to_catalog_table(galaxies, catalog)
 

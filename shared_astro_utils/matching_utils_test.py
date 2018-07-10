@@ -1,6 +1,6 @@
 import pytest
 
-from astropy import units as units
+from astropy import units
 from astropy.table import Table
 
 from shared_astro_utils import matching_utils

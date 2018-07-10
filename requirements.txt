@@ -1,3 +1,7 @@
+# requirements for the package to be created
+# setuptools
+# twine
+# requirements for the package itself
 numpy
 pandas
 scipy

@@ -1,8 +1,8 @@
 import pytest
 
-import fits_utils
+from shared_astro_utils import fits_utils
 
-TEST_EXAMPLES_DIR = 'test_examples'
+TEST_EXAMPLES_DIR = 'shared_astro_utils/test_examples'
 
 
 def test_fits_are_identical():

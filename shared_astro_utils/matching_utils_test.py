@@ -3,7 +3,7 @@ import pytest
 from astropy import units as u
 from astropy.table import Table
 
-from . import matching_utils  # will fail, but work when imported
+from shared_astro_utils import matching_utils
 
 
 @pytest.fixture()

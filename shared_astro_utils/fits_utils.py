@@ -14,6 +14,7 @@ def fits_are_identical(fits_a_loc, fits_b_loc):
     Returns:
         (bool) True if both fits files have identical pixels (including shape), else False
     """
+    # linter error: this is the correct access method for data in 0th fits HDU
     pixels_a = fits.open(fits_a_loc)[0].data
     pixels_b = fits.open(fits_b_loc)[0].data
-    return np.array_equal(pixels_a, pixels_b)
+    return np.allclose(pixels_a[~np.isnan(pixels_a)], pixels_b[~np.isnan(pixels_b)])

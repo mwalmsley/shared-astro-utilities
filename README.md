@@ -10,7 +10,7 @@ Convience functions for astrophysics/zooniverse. Intended for personal use by Mi
 
 This is packaged with PyPI, but only available from the **test** server.
 
-1. From the target environment, run `pip install --index-url https://test.pypi.org/simple/ shared_astro_utils` to install the package.
+1. From the target environment, run `pip install --index-url https://test.pypi.org/simple/ shared_astro_utils` to install the package. If already installed, add the argument `--upgrade`.
 2. Import as `import shared_astro_utils` or e.g. `from shared_astro_utils import matching_utils`.
 
 ### Distribution
@@ -29,4 +29,4 @@ Building is done following [these](https://packaging.python.org/tutorials/packag
 4. Run `python setup.py sdist bdist_wheel` to create the package, wrapped as `/build` and `/dist` folders.
 5. Run `twine upload --repository-url https://test.pypi.org/legacy/ dist/* --skip-existing` to upload the package to the PyPI **test** server.
 
-
+My own username is mikewalmsley.

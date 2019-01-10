@@ -16,9 +16,9 @@ def plot_galaxy_grid(galaxies, rows, columns, save_loc, labels=None):
             data = galaxy.squeeze()
             ax.imshow(data.astype(np.uint8))
             ax.text(0.2, 0.2, labels[n], transform=ax.transAxes)
-            ax.grid(False)
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
+            # ax.grid(False)
+            # ax.get_xaxis().set_visible(False)
+            # ax.get_yaxis().set_visible(False)
             # TODO add labels
             # label_str = '{:.2}'.format(label)
             # ax.text(60, 110, label_str, fontsize=16, color='r')

@@ -23,3 +23,5 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+shared_astro_utils/zooniverse_login.txt

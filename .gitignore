@@ -25,3 +25,4 @@ var/
 *.egg
 
 shared_astro_utils/zooniverse_login.txt
+shared_astro_utils/tests/test_figures/galaxy_grid.png

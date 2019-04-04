@@ -66,21 +66,22 @@ def create_manifest_from_catalog(catalog):
         key_data[link_column] = key_data[link_column].apply(
             lambda url: wrap_url_in_new_tab_markdown(url=url, display_text=link_text))
 
-    # rename all key data columns to appear only in Talk by prepending with '!'
-    current_columns = key_data.columns.values
+    # rename all columns to appear only in Talk by prepending with '!'
+    current_columns = set(key_data.columns.values) - {'#retirement_limit'}
     prepended_columns = ['!' + col for col in current_columns]
     key_data = key_data.rename(columns=dict(zip(current_columns, prepended_columns)))
 
     key_data['metadata_message'] = 'Metadata is available in [Talk](+tab+https://www.zooniverse.org/projects/zookeeper/galaxy-zoo/talk)'
     key_data['#upload_date'] = time_utils.current_date()  # not shown to users
+    
 
     # create the manifest structure that Panoptes Python client expects
     key_data_as_dicts = key_data.apply(lambda x: x.to_dict(), axis=1).values
 
-    png_locs = pd.Series(catalog['png_loc']).values
+    file_locs = pd.Series(catalog['file_loc']).values
 
-    data = zip(png_locs, key_data_as_dicts)
-    manifest = list(map(lambda x: {'png_loc': x[0], 'key_data': x[1]}, data))
+    data = zip(file_locs, key_data_as_dicts)
+    manifest = list(map(lambda x: {'file_loc': x[0], 'key_data': x[1]}, data))
 
     return manifest
 
@@ -88,7 +89,7 @@ def create_manifest_from_catalog(catalog):
 def upload_manifest_to_galaxy_zoo(
     subject_set_name, 
     manifest, 
-    galaxy_zoo_id='5733', 
+    project_id='5733', 
     login_loc='zooniverse_login.txt'
     ):
     """
@@ -97,7 +98,7 @@ def upload_manifest_to_galaxy_zoo(
     Args:
         subject_set_name (str): name for subject set
         manifest (list): containing dicts of form {png_loc: img.png, key_data: {metadata_col: metadata_value}}
-        galaxy_zoo_id (str): panoptes project id e.g. '5733' for Galaxy Zoo, '6490' for mobile
+        project_id (str): panoptes project id e.g. '5733' for Galaxy Zoo, '6490' for mobile
         n_processes (int): number of processes with which to upload galaxies in parallel
 
     Returns:
@@ -107,24 +108,33 @@ def upload_manifest_to_galaxy_zoo(
         logging.warning('Testing mode detected - not uploading!')
         return manifest
 
-    if galaxy_zoo_id == '5733':
+    if project_id == '5733':
         logging.info('Uploading to Galaxy Zoo project 5733')
-    elif galaxy_zoo_id == '6490':
+    elif project_id == '6490':
         logging.info('Uploading to mobile app project 6490')
+    elif project_id == '8751':
+        logging.info('Uploading to staging project 8751')
     else:
-        logging.info('Uploading to unknown project {}'.format(galaxy_zoo_id))
+        logging.info('Uploading to unknown project {}'.format(project_id))
 
     # Important - don't commit the password!
     zooniverse_login = read_data_from_txt(login_loc)
     Panoptes.connect(**zooniverse_login)
 
-    galaxy_zoo = Project.find(galaxy_zoo_id)
+    galaxy_zoo = Project.find(project_id)
 
-    subject_set = SubjectSet()
-
-    subject_set.links.project = galaxy_zoo
-    subject_set.display_name = subject_set_name
-    subject_set.save()
+    # check if subject set already exists
+    subject_set = None
+    subject_sets = SubjectSet.where(project_id=project_id)
+    for candidate_subject_set in subject_sets:
+        if candidate_subject_set.raw['display_name'] == subject_set_name:
+            # use if it already exists
+            subject_set = candidate_subject_set
+    if not subject_set:  # make a new one if not
+        subject_set = SubjectSet()
+        subject_set.links.project = galaxy_zoo
+        subject_set.display_name = subject_set_name
+        subject_set.save()
 
     pbar = tqdm(total=len(manifest), unit=' subjects uploaded')
 
@@ -136,7 +146,6 @@ def upload_manifest_to_galaxy_zoo(
 
     new_subjects = []
     for subject in manifest:
-        print(subject)
         new_subjects.append(save_subject_partial(subject))
 
     subject_set.add(new_subjects)
@@ -148,7 +157,7 @@ def save_subject(manifest_item, project, pbar=None):
     """
     Add manifest item to project. Note: follow with subject_set.add(subject) to associate with subject set.
     Args:
-        manifest_item (dict): of form {png_loc: img.png, key_data: some_data_dict}
+        manifest_item (dict): of form {file_loc: img.png, key_data: some_data_dict}
         project (str): project to upload subject too e.g. '5773' for Galaxy Zoo
         pbar (tqdm.tqdm): progress bar to update. If None, no bar will display.
 
@@ -158,8 +167,8 @@ def save_subject(manifest_item, project, pbar=None):
     subject = Subject()
 
     subject.links.project = project
-    assert os.path.exists(manifest_item['png_loc'])
-    subject.add_location(manifest_item['png_loc'])
+    assert os.path.exists(manifest_item['file_loc'])
+    subject.add_location(manifest_item['file_loc'])
     subject.metadata.update(manifest_item['key_data'])
 
     subject.save()

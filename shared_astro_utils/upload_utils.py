@@ -121,7 +121,7 @@ def upload_manifest_to_galaxy_zoo(
     zooniverse_login = read_data_from_txt(login_loc)
     Panoptes.connect(**zooniverse_login)
 
-    galaxy_zoo = Project.find(project_id)
+    project = Project.find(project_id)
 
     # check if subject set already exists
     subject_set = None
@@ -132,14 +132,14 @@ def upload_manifest_to_galaxy_zoo(
             subject_set = candidate_subject_set
     if not subject_set:  # make a new one if not
         subject_set = SubjectSet()
-        subject_set.links.project = galaxy_zoo
+        subject_set.links.project = project
         subject_set.display_name = subject_set_name
         subject_set.save()
 
     pbar = tqdm(total=len(manifest), unit=' subjects uploaded')
 
     save_subject_params = {
-        'project': galaxy_zoo,
+        'project': project,
         'pbar': pbar
     }
     save_subject_partial = functools.partial(save_subject, **save_subject_params)

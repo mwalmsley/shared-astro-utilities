@@ -2,6 +2,7 @@ import logging
 import os
 import functools
 import ast
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -67,7 +68,7 @@ def create_manifest_from_catalog(catalog):
             lambda url: wrap_url_in_new_tab_markdown(url=url, display_text=link_text))
 
     # rename all columns to appear only in Talk by prepending with '!'
-    current_columns = set(key_data.columns.values) - {'#retirement_limit'}
+    current_columns = set(key_data.columns.values) - {'#retirement_limit', '#uploader'}
     prepended_columns = ['!' + col for col in current_columns]
     key_data = key_data.rename(columns=dict(zip(current_columns, prepended_columns)))
 
@@ -144,20 +145,24 @@ def upload_manifest_to_galaxy_zoo(
     }
     save_subject_partial = functools.partial(save_subject, **save_subject_params)
 
+    print(datetime.now())
     new_subjects = []
-    for subject in manifest:
-        new_subjects.append(save_subject_partial(subject))
+    for manifest_entry in manifest:
+        print('new subject', datetime.now())
+        new_subjects.append(new_subjects.append(save_subject_partial(subject))
 
+    print(datetime.now())
     subject_set.add(new_subjects)
+    print(datetime.now())
 
     return manifest  # for debugging only
 
 
-def save_subject(manifest_item, project, pbar=None):
+def save_subject(manifest_entry, project, pbar=None):
     """
     Add manifest item to project. Note: follow with subject_set.add(subject) to associate with subject set.
     Args:
-        manifest_item (dict): of form {file_loc: img.png, key_data: some_data_dict}
+        manifest_entry (dict): of form {file_loc: img.png, key_data: some_data_dict}
         project (str): project to upload subject too e.g. '5773' for Galaxy Zoo
         pbar (tqdm.tqdm): progress bar to update. If None, no bar will display.
 
@@ -167,9 +172,9 @@ def save_subject(manifest_item, project, pbar=None):
     subject = Subject()
 
     subject.links.project = project
-    assert os.path.exists(manifest_item['file_loc'])
-    subject.add_location(manifest_item['file_loc'])
-    subject.metadata.update(manifest_item['key_data'])
+    assert os.path.exists(manifest_entry['file_loc'])
+    subject.add_location(manifest_entry['file_loc'])
+    subject.metadata.update(manifest_entry['key_data'])
 
     subject.save()
 

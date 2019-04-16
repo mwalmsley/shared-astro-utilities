@@ -105,6 +105,7 @@ def upload_manifest_to_galaxy_zoo(
     Returns:
         None
     """
+    assert os.path.exists(login_loc)
     if 'TEST' in subject_set_name:
         logging.warning('Testing mode detected - not uploading!')
         return manifest

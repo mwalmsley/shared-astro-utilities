@@ -11,6 +11,8 @@ from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
 from shared_astro_utils import time_utils
 
+os.environ['PANOPTES_DEBUG'] = 'true'
+
 def create_manifest_from_catalog(catalog):
     """
     Create dict of files and metadata.
@@ -145,15 +147,13 @@ def upload_manifest_to_galaxy_zoo(
     }
     save_subject_partial = functools.partial(save_subject, **save_subject_params)
 
-    print(datetime.now())
     new_subjects = []
-    for manifest_entry in manifest:
-        print('new subject', datetime.now())
-        new_subjects.append(new_subjects.append(save_subject_partial(subject))
+    with Subject.async_saves():
+        for manifest_entry in manifest:
+            new_subjects.append(save_subject_partial(manifest_entry))
 
-    print(datetime.now())
     subject_set.add(new_subjects)
-    print(datetime.now())
+    logging.info('{} subjects linked'.format(new_subjects))
 
     return manifest  # for debugging only
 

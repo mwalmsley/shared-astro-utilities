@@ -90,7 +90,7 @@ def create_manifest_from_catalog(catalog):
 def upload_manifest_to_galaxy_zoo(
     subject_set_name, 
     manifest, 
-    project_id='5733', 
+    project_id='5733',  # default to main GZ project
     login_loc='zooniverse_login.txt'
     ):
     """

@@ -9,4 +9,4 @@ astropy
 pytest
 pytest-cov
 coverage
-panoptes-client
+panoptes-client==1.1.1

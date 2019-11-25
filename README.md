@@ -6,14 +6,28 @@
 Convience functions for astrophysics/zooniverse. Intended for personal use by Mike Walmsley, but public. Contributions welcome.
 
 
+
+
 ### Installation
 
-This is packaged with PyPI, but only available from the **test** server.
+This is packaged with [PyPI](https://test.pypi.org/project/shared-astro-utils) here, but only available from the **test** server.
 
-1. From the target environment, run `pip install --index-url https://test.pypi.org/simple/ shared_astro_utils` to install the package. If already installed, add the argument `--upgrade`.
+
+1. From the target environment, run `pip install -i https://test.pypi.org/simple/ shared-astro-utils` to install the package. If already installed, add the argument `--upgrade`.
 2. Import as `import shared_astro_utils` or e.g. `from shared_astro_utils import matching_utils`.
 
-### Distribution
+### Features
+
+- astropy_utils to save a Table column subset or safely convert a nested Table to pandas
+- fits_utils to check if two fits files are identical
+- matching_utils for in-memory skymatching
+- object_utils for converting a Python object to a dict
+- panoptes_utils to parse a Panoptes classification export
+- plotting_utils for plotting a grid of images without whitespace
+- time_utils for getting the current time/data easily
+- upload_utils for uploading new galaxies to Galaxy Zoo, and to convert pandas catalogs to Panoptes-suitable manifests
+
+### Creating Distributions
 
 The root folder `shared-astro-utilities` is the usual repo folder, and should contain a `setup.py`, `requirements.txt`, `README.MD`, `LICENSE`, and the usual CI configurations. This is the location for unit tests to run from. 
 

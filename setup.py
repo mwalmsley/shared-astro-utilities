@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="shared_astro_utils",
-    version="0.0.5",
+    version="0.0.6",
     author="Mike Walmsley",
     author_email="walmsleymk1@gmail.com",
     description="Shared astronomy utilities",

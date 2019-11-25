@@ -21,7 +21,8 @@ def cache_table(table_loc, cache_loc, useful_cols, loading_func=Table.read, kwar
     print('Begin caching at {}'.format(current_time()))
     data = loading_func(table_loc, **kwargs)
     print('Table loaded at {}'.format(current_time()))
-    data[useful_cols].write(cache_loc, overwrite=True)
+    data = data[useful_cols]  # need to lower the memory before writing, because writing involves a copy
+    data.write(cache_loc, overwrite=True)
     print('Saved to astropy.Table at {}'.format(current_time()))
 
 

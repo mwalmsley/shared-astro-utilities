@@ -11,6 +11,41 @@ from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
 from shared_astro_utils import time_utils
 
+
+def upload_to_gz(
+        login_loc: str,
+        selected_catalog: pd.DataFrame,
+        name: str,
+        retirement: int,
+        project_id='5733',
+        uploader='gz_upload_util'):
+    """Simple wrapper to upload selected galaxies to GZ
+
+    Args:
+        login_loc (str): path to json file of form {"username": ..., "password": ...}
+        selected_catalog (pd.DataFrame): catalog of galaxies to be uploaded
+        name (str): name of subject set to be created or appended
+        retirement (int): sets retirement_limit metadata field, used by Caesar to retire after this many classifications
+        project_id (str, optional): Which project to upload to. Defaults to '5733'. 6490 for GZ Mobile.
+        uploader (str, optional): Sets uploader metadata field, to name the uploader used (for posterity only). Defaults to 'gz_upload_util'.
+    """
+    # restrict to key columns
+    upload_cols = ['iauname', 'nsa_id', 'ra', 'dec', 'petrotheta',
+                   'petroth50', 'petroth90', 'redshift', 'nsa_version', 'file_loc']
+    upload_catalog = selected_catalog[upload_cols]
+    upload_catalog['#retirement_limit'] = retirement
+    upload_catalog['#uploader'] = uploader
+
+    logging.info(f'Uploading {len(selected_catalog)} subjects to {name}')
+    manifest = create_manifest_from_catalog(upload_catalog)
+    upload_manifest_to_galaxy_zoo(
+        subject_set_name=name,
+        manifest=manifest,
+        project_id=project_id,
+        login_loc=login_loc)
+    logging.info('Upload complete')
+
+
 def create_manifest_from_catalog(catalog):
     """
     Create dict of files and metadata.

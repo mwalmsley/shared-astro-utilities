@@ -11,6 +11,8 @@ from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
 from shared_astro_utils import time_utils
 
+UPLOAD_COLS = ['iauname', 'nsa_id', 'ra', 'dec', 'petrotheta',
+                   'petroth50', 'petroth90', 'redshift', 'nsa_version', 'file_loc']
 
 def upload_to_gz(
         login_loc: str,
@@ -30,8 +32,7 @@ def upload_to_gz(
         uploader (str, optional): Sets uploader metadata field, to name the uploader used (for posterity only). Defaults to 'gz_upload_util'.
     """
     # restrict to key columns
-    upload_cols = ['iauname', 'nsa_id', 'ra', 'dec', 'petrotheta',
-                   'petroth50', 'petroth90', 'redshift', 'nsa_version', 'file_loc']
+    upload_cols = UPLOAD_COLS
     upload_catalog = selected_catalog[upload_cols]
     upload_catalog['#retirement_limit'] = retirement
     upload_catalog['#uploader'] = uploader

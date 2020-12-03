@@ -108,7 +108,7 @@ def create_manifest_from_catalog(catalog):
     prepended_columns = ['!' + col for col in current_columns]
     key_data = key_data.rename(columns=dict(zip(current_columns, prepended_columns)))
 
-    key_data['metadata_message'] = 'Metadata is available in [Talk](+tab+https://www.zooniverse.org/projects/zookeeper/galaxy-zoo/talk)'
+    key_data['metadata_message'] = 'You can access this galaxy\'s metadata if you chose to discuss it with other volunteers by pressing "Done and Talk" at the end of your classification.'
     key_data['#upload_date'] = time_utils.current_date()  # not shown to users
     
 

@@ -35,7 +35,7 @@ def match_galaxies_to_catalog_table(
 
 
 def match_galaxies_to_catalog_pandas(galaxies, catalog, matching_radius=10 * units.arcsec,
-                              galaxy_suffix='_subject', catalog_suffix=''):
+                              galaxy_suffix='_subject', catalog_suffix='', how_join='inner'):
 
     galaxies_coord = SkyCoord(ra=galaxies['ra'].values * units.degree, dec=galaxies['dec'].values * units.degree)
     catalog_coord = SkyCoord(ra=catalog['ra'].values * units.degree, dec=catalog['dec'].values * units.degree)
@@ -50,7 +50,7 @@ def match_galaxies_to_catalog_pandas(galaxies, catalog, matching_radius=10 * uni
         matched_galaxies,
         catalog,
         on='best_match',
-        how='inner',
+        how=how_join,
         suffixes=['{}'.format(galaxy_suffix), '{}'.format(catalog_suffix)]
     )
     # correct names not shared

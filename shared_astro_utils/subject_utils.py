@@ -16,6 +16,8 @@ def authenticate():  # inplace
 
 
 def upload_subject(locations: List, project: Project, subject_set_name: str, metadata: Dict):
+    assert '!filename' in metadata.keys(), 'Metadata must contain !filename for BAJOR'
+    
     subject = Subject()
     # add files
     subject.links.project = project

@@ -9,7 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
-from shared_astro_utils import time_utils
+from shared_astro_utils import time_utils, subject_utils
 
 UPLOAD_COLS = ['iauname', 'nsa_id', 'ra', 'dec', 'petrotheta',
                    'petroth50', 'petroth90', 'redshift', 'nsa_version', 'file_loc']
@@ -39,7 +39,7 @@ def upload_to_gz(
 
     logging.info(f'Uploading {len(selected_catalog)} subjects to {name}')
     manifest = create_manifest_from_catalog(upload_catalog)
-    upload_manifest_to_galaxy_zoo(
+    bulk_upload_subjects(
         subject_set_name=name,
         manifest=manifest,
         project_id=project_id,
@@ -63,31 +63,31 @@ def create_manifest_from_catalog(catalog):
         catalog (astropy.Table): NSA joint catalog to upload
 
     Returns:
-        (dict) of form {png_loc: img.png, key_data: {metadata_col: metadata_value}}
+        (dict) of form {png_loc: img.png, metadata: {metadata_col: metadata_value}}
     """
-    key_data = catalog.copy()  # assume already filtered - all cols will be included!
+    metadata_df = catalog.copy()  # assume already filtered - all cols will be included!
 
     # np.nan cannot be handled by JSON encoder. Convert to flag value of -999
-    key_data = key_data.applymap(replace_nan_with_flag)
+    metadata_df = metadata_df.applymap(replace_nan_with_flag)
     # bytes cannot be handled by JSON encoder. Convert to string
-    key_data = key_data.applymap(replace_bytes_with_str)
+    metadata_df = metadata_df.applymap(replace_bytes_with_str)
 
-    key_data['decals_search'] = key_data.apply(
+    metadata_df['decals_search'] = metadata_df.apply(
         lambda galaxy: coords_to_decals_skyviewer(galaxy['ra'], galaxy['dec']),
         axis=1)
-    key_data['sdss_search'] = key_data.apply(
+    metadata_df['sdss_search'] = metadata_df.apply(
         lambda galaxy: coords_to_sdss_navigate(galaxy['ra'], galaxy['dec']),
         axis=1)
-    key_data['panstarrs_dr1_search'] = key_data.apply(
+    metadata_df['panstarrs_dr1_search'] = metadata_df.apply(
         lambda galaxy: coords_to_panstarrs(galaxy['ra'], galaxy['dec']),
         axis=1)
-    key_data['simbad_search'] = key_data.apply(
+    metadata_df['simbad_search'] = metadata_df.apply(
         lambda galaxy: coords_to_simbad(galaxy['ra'], galaxy['dec'], search_radius=10.),
         axis=1)
-    key_data['nasa_ned_search'] = key_data.apply(
+    metadata_df['nasa_ned_search'] = metadata_df.apply(
         lambda galaxy: coords_to_ned(galaxy['ra'], galaxy['dec'], search_radius=10.),
         axis=1)
-    key_data['vizier_search'] = key_data.apply(
+    metadata_df['vizier_search'] = metadata_df.apply(
         lambda galaxy: coords_to_vizier(galaxy['ra'], galaxy['dec'], search_radius=10.),
         axis=1)
 
@@ -100,48 +100,45 @@ def create_manifest_from_catalog(catalog):
         'vizier_search': 'Click to search VizieR'
     }
     for link_column, link_text in markdown_text.items():
-        key_data[link_column] = key_data[link_column].apply(
+        metadata_df[link_column] = metadata_df[link_column].apply(
             lambda url: wrap_url_in_new_tab_markdown(url=url, display_text=link_text))
 
     # rename all columns to appear only in Talk by prepending with '!'
-    current_columns = set(key_data.columns.values) - {'#retirement_limit', '#uploader'}
+    current_columns = set(metadata_df.columns.values) - {'#retirement_limit', '#uploader'}
     prepended_columns = ['!' + col for col in current_columns]
-    key_data = key_data.rename(columns=dict(zip(current_columns, prepended_columns)))
+    metadata_df = metadata_df.rename(columns=dict(zip(current_columns, prepended_columns)))
 
-    key_data['metadata_message'] = 'You can access this galaxy\'s metadata if you chose to discuss it with other volunteers by pressing "Done and Talk" at the end of your classification.'
-    key_data['#upload_date'] = time_utils.current_date()  # not shown to users
+    metadata_df['metadata_df_message'] = 'You can access this galaxy\'s metadata if you chose to discuss it with other volunteers by pressing "Done and Talk" at the end of your classification.'
+    metadata_df['#upload_date'] = time_utils.current_date()  # not shown to users
+
+    metadata_df['!filename'] = metadata_df['file_loc'].apply(os.path.basename)
     
 
     # create the manifest structure that Panoptes Python client expects
-    key_data_as_dicts = key_data.apply(lambda x: x.to_dict(), axis=1).values
+    metadata = metadata_df.to_dict(orient='records')
 
-    file_locs = pd.Series(catalog['file_loc']).values
-
-    data = zip(file_locs, key_data_as_dicts)
-    manifest = list(map(lambda x: {'file_loc': x[0], 'key_data': x[1]}, data))
-
-    return manifest
+    return metadata
 
 
-def upload_manifest_to_galaxy_zoo(
+def bulk_upload_subjects(
     subject_set_name, 
     manifest, 
-    project_id='5733',  # default to main GZ project
-    login_loc='zooniverse_login.txt'
+    project_id='5733'  # default to main GZ project
+    # login_loc='zooniverse_login.txt'
     ):
     """
     Save manifest (set of galaxies with metadata prepared) to Galaxy Zoo
 
     Args:
         subject_set_name (str): name for subject set
-        manifest (list): containing dicts of form {png_loc: img.png, key_data: {metadata_col: metadata_value}}
+        manifest (list): containing dicts of form {locations: [img.jpg], metadata: {metadata_col: metadata_value, ...}}
         project_id (str): panoptes project id e.g. '5733' for Galaxy Zoo, '6490' for mobile
         n_processes (int): number of processes with which to upload galaxies in parallel
 
     Returns:
         None
     """
-    assert os.path.exists(login_loc)
+    # assert os.path.exists(login_loc)
     if 'TEST' in subject_set_name:
         logging.warning('Testing mode detected - not uploading!')
         return manifest
@@ -155,32 +152,34 @@ def upload_manifest_to_galaxy_zoo(
     else:
         logging.info('Uploading to unknown project {}'.format(project_id))
 
-    # Important - don't commit the password!
-    zooniverse_login = read_data_from_txt(login_loc)
-    Panoptes.connect(**zooniverse_login)
+    subject_utils.authenticate()
+
+
 
     project = Project.find(project_id)
 
     # check if subject set already exists
-    subject_set = None
-    subject_sets = SubjectSet.where(project_id=project_id)
-    for candidate_subject_set in subject_sets:
-        if candidate_subject_set.raw['display_name'] == subject_set_name:
-            # use if it already exists
-            subject_set = candidate_subject_set
-    if not subject_set:  # make a new one if not
-        subject_set = SubjectSet()
-        subject_set.links.project = project
-        subject_set.display_name = subject_set_name
-        subject_set.save()
+    # subject_set = None
+    # subject_sets = SubjectSet.where(project_id=project_id)
+    # for candidate_subject_set in subject_sets:
+    #     if candidate_subject_set.raw['display_name'] == subject_set_name:
+    #         # use if it already exists
+    #         subject_set = candidate_subject_set
+    # if not subject_set:  # make a new one if not
+    #     subject_set = SubjectSet()
+    #     subject_set.links.project = project
+    #     subject_set.display_name = subject_set_name
+    #     subject_set.save()
+
+    subject_set = subject_utils.get_or_create_subject_set(project_id, subject_set_name)
 
     pbar = tqdm(total=len(manifest), unit=' subjects uploaded')
 
-    save_subject_params = {
-        'project': project,
-        'pbar': pbar
-    }
-    save_subject_partial = functools.partial(save_subject, **save_subject_params)
+    # save_subject_params = {
+    #     'project': project,
+    #     'pbar': pbar
+    # }
+    # save_subject_partial = functools.partial(save_subject, **save_subject_params)
 
     # upload in async blocks, to avoid huge join at end
     manifest_block_start = 0
@@ -188,11 +187,19 @@ def upload_manifest_to_galaxy_zoo(
 
     while True:
         manifest_block = manifest[manifest_block_start: manifest_block_start + manifest_block_size]
+        
 
         new_subjects = []
         with Subject.async_saves():
             for manifest_entry in manifest_block:
-                new_subjects.append(save_subject_partial(manifest_entry))
+                new_subjects.append(
+                    save_subject(
+                        locations=manifest_entry['locations'], 
+                        metadata=manifest_entry['metadata'],
+                        project=project,
+                        pbar=pbar
+                    )
+                )
 
         subject_set.add(new_subjects)
         logging.info('{} subjects linked'.format(new_subjects))
@@ -204,12 +211,13 @@ def upload_manifest_to_galaxy_zoo(
     return manifest  # for debugging only
 
 
-def save_subject(manifest_entry, project, pbar=None):
+def save_subject(locations, project, metadata, pbar=None):
     """
     Add manifest item to project. Note: follow with subject_set.add(subject) to associate with subject set.
     Args:
-        manifest_entry (dict): of form {file_loc: img.png, key_data: some_data_dict}
+        locations (list): ['img.jpg'] list of file locations to upload
         project (str): project to upload subject too e.g. '5773' for Galaxy Zoo
+        metadata (dict): metadata to attach to subject
         pbar (tqdm.tqdm): progress bar to update. If None, no bar will display.
 
     Returns:
@@ -218,9 +226,12 @@ def save_subject(manifest_entry, project, pbar=None):
     subject = Subject()
 
     subject.links.project = project
-    assert os.path.exists(manifest_entry['file_loc'])
-    subject.add_location(manifest_entry['file_loc'])
-    subject.metadata.update(manifest_entry['key_data'])
+    for location in locations:
+        if not os.path.isfile(location):
+            raise FileNotFoundError('Missing subject location: {}'.format(location))
+        subject.add_location(location)
+    assert '!filename' in metadata.keys(), 'Metadata must contain !filename for BAJOR'
+    subject.metadata.update(metadata)
 
     subject.save()
 
@@ -228,20 +239,6 @@ def save_subject(manifest_entry, project, pbar=None):
         pbar.update()
 
     return subject
-
-
-def read_data_from_txt(file_loc):
-    """
-    Read and evaluate a python data structure saved as a txt file.
-    Args:
-        file_loc (str): location of file to read
-
-    Returns:
-        data structure contained in file
-    """
-    with open(file_loc, 'r') as f:
-        s = f.read()
-        return ast.literal_eval(s)
 
 
 def replace_nan_with_flag(x):

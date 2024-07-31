@@ -1,8 +1,7 @@
 import logging
 import os
 import functools
-import ast
-from datetime import datetime
+import json
 
 import numpy as np
 import pandas as pd
@@ -11,34 +10,32 @@ from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
 from shared_astro_utils import time_utils
 
-UPLOAD_COLS = ['iauname', 'nsa_id', 'ra', 'dec', 'petrotheta',
-                   'petroth50', 'petroth90', 'redshift', 'nsa_version', 'file_loc']
 
 def upload_to_gz(
         login_loc: str,
-        selected_catalog: pd.DataFrame,
+        df: pd.DataFrame,
         name: str,
-        retirement: int,
+        upload_cols: list,
+        caesar_retirement: int,
         project_id='5733',
         uploader='gz_upload_util'):
     """Simple wrapper to upload selected galaxies to GZ
 
     Args:
         login_loc (str): path to json file of form {"username": ..., "password": ...}
-        selected_catalog (pd.DataFrame): catalog of galaxies to be uploaded
+        df (pd.DataFrame): catalog of galaxies to be uploaded
         name (str): name of subject set to be created or appended
         retirement (int): sets retirement_limit metadata field, used by Caesar to retire after this many classifications
         project_id (str, optional): Which project to upload to. Defaults to '5733'. 6490 for GZ Mobile.
         uploader (str, optional): Sets uploader metadata field, to name the uploader used (for posterity only). Defaults to 'gz_upload_util'.
     """
     # restrict to key columns
-    upload_cols = UPLOAD_COLS
-    upload_catalog = selected_catalog[upload_cols]
-    upload_catalog['#retirement_limit'] = retirement
-    upload_catalog['#uploader'] = uploader
+    df = df[upload_cols + ['file_loc']]
+    df['#retirement_limit'] = caesar_retirement
+    df['#uploader'] = uploader
 
-    logging.info(f'Uploading {len(selected_catalog)} subjects to {name}')
-    manifest = create_manifest_from_catalog(upload_catalog)
+    logging.info(f'Uploading {len(df)} subjects to {name}')
+    manifest = create_manifest_from_catalog(df)
     upload_manifest_to_galaxy_zoo(
         subject_set_name=name,
         manifest=manifest,
@@ -72,7 +69,11 @@ def create_manifest_from_catalog(catalog):
     # bytes cannot be handled by JSON encoder. Convert to string
     key_data = key_data.applymap(replace_bytes_with_str)
 
-    key_data['decals_search'] = key_data.apply(
+
+    key_data['hsc_pdr3_wide_search'] = key_data.apply(
+        lambda galaxy: coords_to_hsc_pdr3_wide(galaxy['ra'], galaxy['dec']),
+        axis=1)
+    key_data['desi_search'] = key_data.apply(
         lambda galaxy: coords_to_decals_skyviewer(galaxy['ra'], galaxy['dec']),
         axis=1)
     key_data['sdss_search'] = key_data.apply(
@@ -91,13 +92,15 @@ def create_manifest_from_catalog(catalog):
         lambda galaxy: coords_to_vizier(galaxy['ra'], galaxy['dec'], search_radius=10.),
         axis=1)
 
+
     markdown_text = {
-        'decals_search': 'Click to view in DECALS',
+        'hsc_pdr3_wide_search': 'Click to search HSC PDR3 Wide',
+        'desi_search': 'Click to view in DESI LS DR9',
         'sdss_search': 'Click to view in SDSS',
         'panstarrs_dr1_search': 'Click to view in PANSTARRS DR1',
         'simbad_search': 'Click to search SIMBAD',
         'nasa_ned_search': 'Click to search NASA NED',
-        'vizier_search': 'Click to search VizieR'
+        'vizier_search': 'Click to search VizieR',
     }
     for link_column, link_text in markdown_text.items():
         key_data[link_column] = key_data[link_column].apply(
@@ -156,8 +159,9 @@ def upload_manifest_to_galaxy_zoo(
         logging.info('Uploading to unknown project {}'.format(project_id))
 
     # Important - don't commit the password!
-    zooniverse_login = read_data_from_txt(login_loc)
-    Panoptes.connect(**zooniverse_login)
+    with open(login_loc, 'r') as f:
+        auth_details = json.load(f)
+    Panoptes.connect(**auth_details)
 
     project = Project.find(project_id)
 
@@ -230,19 +234,6 @@ def save_subject(manifest_entry, project, pbar=None):
     return subject
 
 
-def read_data_from_txt(file_loc):
-    """
-    Read and evaluate a python data structure saved as a txt file.
-    Args:
-        file_loc (str): location of file to read
-
-    Returns:
-        data structure contained in file
-    """
-    with open(file_loc, 'r') as f:
-        s = f.read()
-        return ast.literal_eval(s)
-
 
 def replace_nan_with_flag(x):
     """
@@ -301,7 +292,7 @@ def coords_to_decals_skyviewer(ra, dec):
     Returns:
         (str): decals_skyviewer viewpoint url for objects at ra, dec
     """
-    return 'http://www.legacysurvey.org/viewer?ra={}&dec={}&zoom=15&layer=decals-dr5'.format(ra, dec)
+    return 'http://www.legacysurvey.org/viewer?ra={}&dec={}&zoom=15&layer=ls-dr9'.format(ra, dec)
 
 
 def coords_to_sdss_navigate(ra, dec):
@@ -366,6 +357,24 @@ def coords_to_panstarrs(ra, dec):
     return 'http://ps1images.stsci.edu/cgi-bin/ps1cutouts?pos={}{:+f}&filter=color&filter=g&filter=r&filter=i&filter=z&filter=y&filetypes=stack&auxiliary=data&size=240&output_size=0&verbose=0&autoscale=99.500000&catlist='.format(
         ra, dec)
 
+def coords_to_hsc_pdr3_wide(ra, dec):
+    # degree_ra / url_ra = 0.01745329458
+    # 0.01745329458 = 2 * pi / 360
+    ra_rad = ra * 2 * np.pi / 360
+    dec_rad = dec * 2 * np.pi / 360
+    hsc_url = f'https://hsc-release.mtk.nao.ac.jp/hscMap-pdr3/app/#/?_=%7B%22view%22%3A%7B%22a%22%3A{ra_rad},%22d%22%3A{dec_rad},%22fovy%22%3A0.00019420519743704133,%22roll%22%3A0%7D,%22sspParams%22%3A%7B%22type%22%3A%22SDSS_TRUE_COLOR%22,%22filter%22%3A%5B%22HSC-I%22,%22HSC-R%22,%22HSC-G%22%5D,%22simpleRgb%22%3A%7B%22beta%22%3A22026.465794806718,%22a%22%3A1,%22bias%22%3A0.05,%22b0%22%3A0%7D,%22sdssTrueColor%22%3A%7B%22beta%22%3A22026.465794806718,%22a%22%3A1,%22bias%22%3A0.05,%22b0%22%3A0%7D,%22simpleColorMatrix%22%3A%7B%22colors%22%3A%5B%7B%22filterName%22%3A%22HSC-G%22,%22enabled%22%3Atrue,%22value%22%3A%5B0,0,1%5D%7D,%7B%22filterName%22%3A%22HSC-R%22,%22enabled%22%3Atrue,%22value%22%3A%5B0,1,0%5D%7D,%7B%22filterName%22%3A%22HSC-I%22,%22enabled%22%3Atrue,%22value%22%3A%5B1,0,0%5D%7D,%7B%22filterName%22%3A%22HSC-Z%22,%22enabled%22%3Afalse,%22value%22%3A%5B0,0,0%5D%7D,%7B%22filterName%22%3A%22HSC-Y%22,%22enabled%22%3Afalse,%22value%22%3A%5B0,0,0%5D%7D,%7B%22filterName%22%3A%22NB0387%22,%22enabled%22%3Afalse,%22value%22%3A%5B0,0,0%5D%7D,%7B%22filterName%22%3A%22NB0816%22,%22enabled%22%3Afalse,%22value%22%3A%5B0,0,0%5D%7D,%7B%22filterName%22%3A%22NB0921%22,%22enabled%22%3Afalse,%22value%22%3A%5B0,0,0%5D%7D%5D,%22beta%22%3A22026.465794806718,%22a%22%3A1,%22bias%22%3A0.05,%22b0%22%3A0%7D%7D,%22externalTiles%22%3A%5B%5D,%22activeReruns%22%3A%5B%22pdr3_wide%22,%22pdr3_dud%22%5D%7D'
+    return hsc_url
 
 def wrap_url_in_new_tab_markdown(url, display_text):
     return '[{}](+tab+{})'.format(display_text, url)
+
+
+if __name__ == '__main__':
+
+    # ra_deg = 15.952520
+    # dec_deg = 1.367091
+    # ra_deg = 30.561544
+    # dec_deg = -6.586664
+    ra_deg = 131.07672736058885
+    dec_deg = -0.08495299231851258
+    print(coords_to_hsc_pdr3_wide(ra_deg, dec_deg))

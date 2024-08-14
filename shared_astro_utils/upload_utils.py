@@ -123,7 +123,8 @@ def create_manifest_from_catalog(catalog):
 def bulk_upload_subjects(
     subject_set_name, 
     manifest, 
-    project_id='5733'  # default to main GZ project
+    project_id='5733',  # default to main GZ project
+    async_batch_size=20
     # login_loc='zooniverse_login.txt'
     ):
     """
@@ -182,11 +183,14 @@ def bulk_upload_subjects(
     # save_subject_partial = functools.partial(save_subject, **save_subject_params)
 
     # upload in async blocks, to avoid huge join at end
-    manifest_block_start = 0
-    manifest_block_size = 100
 
+
+    # https://github.com/zooniverse/panoptes-cli/blob/fb5da0d61fe50d441baef5d62079d1f91e2b5a46/panoptes_cli/commands/subject_set.py#L411
+    # https://github.com/zooniverse/panoptes-python-client/issues/290
+        
+    manifest_block_start = 0
     while True:
-        manifest_block = manifest[manifest_block_start: manifest_block_start + manifest_block_size]
+        manifest_block = manifest[manifest_block_start: manifest_block_start + async_batch_size]
         
 
         new_subjects = []
@@ -200,11 +204,13 @@ def bulk_upload_subjects(
                         pbar=pbar
                     )
                 )
-
-        subject_set.add(new_subjects)
+        # new - avoid the link race condition panoptes-side by doing the 'add' link one at a time
+        # the add (vs the save) is pretty much instant
+        for subject in new_subjects:
+            subject_set.add(subject)
         logging.info('{} subjects linked'.format(new_subjects))
 
-        manifest_block_start += manifest_block_size
+        manifest_block_start += async_batch_size
         if manifest_block_start > len(manifest):
             break
 

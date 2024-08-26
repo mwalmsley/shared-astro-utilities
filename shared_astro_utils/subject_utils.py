@@ -4,7 +4,7 @@ import logging
 import json
 from typing import List, Dict
 
-from panoptes_client import Panoptes, Project, SubjectSet, Subject
+from panoptes_client import Panoptes, Project, SubjectSet, Subject, panoptes
 
 
 def authenticate():  # inplace
@@ -15,7 +15,7 @@ def authenticate():  # inplace
     Panoptes.connect(**credentials)
 
 
-def upload_subject(locations: List, project: Project, subject_set_name: str, metadata: Dict):
+def upload_subject(locations: List, project: Project, subject_set_name: str, metadata: Dict, max_retries=5):
     assert '!filename' in metadata.keys(), 'Metadata must contain !filename for BAJOR'
     
     subject = Subject()
@@ -27,13 +27,19 @@ def upload_subject(locations: List, project: Project, subject_set_name: str, met
         subject.add_location(location)
 
     subject.metadata.update(metadata)
+    subject.save()
 
     subject_set_name = subject_set_name
-    subject_set = get_or_create_subject_set(project.id, subject_set_name)
-
-    subject.save()
-    subject_set.add(subject)
-    return subject.id
+    
+    while max_retries > 0:
+        try:
+            subject_set = get_or_create_subject_set(project.id, subject_set_name)
+            subject_set.add(subject)
+            return subject.id
+        except panoptes.PanoptesAPIException as e:  # Stale SubjectSet, need to re-fetch
+            logging.error(f'Error adding subject to subject set, retrying: {e}')
+            max_retries -= 1
+    raise Exception('Failed to add subject to subject set')
 
 
 def make_subject_sets(project_id: int, names: List):
